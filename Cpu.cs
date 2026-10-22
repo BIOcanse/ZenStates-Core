@@ -164,8 +164,8 @@ namespace ZenStates.Core
             public SMU.SmuType smuType;
         }
 
-        public readonly IODriver io = new IODriver();
-        private readonly Mmio mmio;
+        // Resource Manager: kernel access is exclusively through PawnIO.
+
         public readonly CPUInfo info;
         public readonly SystemInfo systemInfo;
         public readonly SMU smu;
@@ -372,7 +372,7 @@ namespace ZenStates.Core
                     throw new ApplicationException("Error initializing PawnIO AMD module.", ex);
                 }
 
-                mmio = new Mmio();
+                // The bridge does not expose raw physical-memory clock diagnostics.
 
                 if (Opcode.Cpuid(0x00000001, 0, out uint eax, out uint ebx, out uint ecx, out uint edx))
                 {
@@ -443,9 +443,9 @@ namespace ZenStates.Core
             {
                 info.patchLevel = GetPatchLevel();
                 info.svi2 = GetSVI2Info(info.codeName);
-                info.aod = new AOD(io, this);
-                info.apob = new Apob(info);
-                systemInfo = new SystemInfo(info, smu, GetAgesaVersion());
+                // AOD/APOB/legacy AGESA raw-memory diagnostics are not composed.
+
+                systemInfo = new SystemInfo(info, smu, string.Empty);
                 powerTable = new PowerTable(_pawnRyzenSmu, info.codeName);
 
                 if (!SendTestMessage())
@@ -497,26 +497,7 @@ namespace ZenStates.Core
             }
         }
 
-        public bool IoReadDwordEx(uint addr, ref uint data, int maxRetries = 10)
-        {
-            if (!Mutexes.WaitPciBus(5000))
-                return false;
 
-            try
-            {
-                io.DlPortWritePortUlong(0x0CF8, addr);
-                data = unchecked((uint)(io.DlPortReadPortUlong(0x0CFC)));
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
-            finally
-            {
-                Mutexes.ReleasePciBus();
-            }
-        }
 
         public uint ReadDwordNoLock(uint addr, int maxRetries = 10)
         {
@@ -1046,11 +1027,11 @@ namespace ZenStates.Core
 
         public uint GetSmuVersion() => _pawnRyzenSmu.GetSmuVersion();
 
-        public double? GetBclk() => mmio.GetBclk();
 
-        public Mmio.ClkGen GetStrapStatus() => mmio.GetStrapStatus();
 
-        public bool SetBclk(double blck) => mmio.SetBclk(blck);
+
+
+
 
         public SMU.Status TransferTableToDram() => new TransferTableToDram(smu).Execute().status;
 
@@ -1518,20 +1499,7 @@ namespace ZenStates.Core
             }
         }
 
-        private string GetAgesaVersion()
-        {
-            try
-            {
-                var data = io.ReadMemory(new IntPtr(0xE0000), (int)(0xFFFFF - 0xE0000));
-                return AgesaUtils.ParseVersion(data);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Could not find AGESA version: {ex.Message}");
-            }
 
-            return string.Empty;
-        }
 
         public MemoryConfig GetMemoryConfig() => memoryConfig;
 
@@ -1546,7 +1514,7 @@ namespace ZenStates.Core
                     _smbusPiix4?.Dispose();
                     _lpcIO?.Close();
                     systemInfo?.Dispose();
-                    io?.Dispose();
+
                     Mutexes.Close();
                     Opcode.Close();
                 }
