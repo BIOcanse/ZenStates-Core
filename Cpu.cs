@@ -451,7 +451,6 @@ namespace ZenStates.Core
                 if (!SendTestMessage())
                     LastError = new ApplicationException("SMU is not responding to test message!");
 
-                powerTable.Refresh();
 
                 Status = IODriver.LibStatus.OK;
             }

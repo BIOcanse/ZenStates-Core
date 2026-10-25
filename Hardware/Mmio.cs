@@ -143,6 +143,7 @@ namespace ZenStates.Core.Hardware
 
         public double? GetBclk()
         {
+            if (io == null) return null;
             if (io.GetPhysLong((UIntPtr)MISC_CGPLLConfig3, out uint value))
             {
                 uint index = Utils.GetBits(value, 4, 9);

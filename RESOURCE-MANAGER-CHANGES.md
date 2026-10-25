@@ -7,3 +7,11 @@ The bridge uses the existing PawnIO AMD/SMU/SMBus/LPC path exclusively. Cpu no l
 The dependency PostBuild and application publish recipe no longer copy InpOut or WinIo binaries. Other applications' installed services, drivers and ACLs are never changed. The unmodified historical driver source remains upstream material, not a product initialization path.
 
 Validation must compile/publish the bridge without launching hardware actions and inspect the actual publication file list. Source edits alone do not establish hardware qualification.
+
+## HardwareBridge 0.2.1: PM-table exception storm
+
+- `Hardware/PowerTable.cs`: an absent MMIO singleton leaves BCLK unknown and applies no correction. Missing SMU, missing DRAM base address and an unsupported table definition are retained as `UnavailableKind` facts instead of exceptions. Only a table that has not updated is retried; a thrown refresh failure returns once.
+- `Hardware/Mmio.cs`: `GetBclk` returns null when no physical-memory backend exists. It does not construct a driver or invent a clock value.
+- `Cpu.cs`: omit the duplicate initial refresh; the PowerTable constructor already initializes it.
+
+The bridge retains PM-table capability facts per session. Repeated describe operations do not refresh the table; `refresh-power-table` explicitly re-establishes availability. Offline tests in `tests/PowerTableHarness` open no hardware.

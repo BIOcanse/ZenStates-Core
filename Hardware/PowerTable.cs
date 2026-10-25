@@ -403,17 +403,42 @@ namespace ZenStates.Core
             return GetDefaultTableDef(tableVersion);
         }
 
+        public enum UnavailableKind
+        {
+            None,
+            NoSmu,
+            NoDramBaseAddress,
+            UnsupportedTableVersion
+        }
+
+        // Structural facts are established at construction, once per SMU session.
+        public UnavailableKind UnavailableReason { get; private set; }
+
         public PowerTable(RyzenSmu smuInstance, Cpu.CodeName? codeName)
         {
             this._codeName = codeName ?? Cpu.CodeName.Unsupported;
-            this.smu = smuInstance ?? throw new ArgumentNullException(nameof(smuInstance));
+            this.smu = smuInstance;
             _instance = this;
 
+            if (smu == null)
+            {
+                UnavailableReason = UnavailableKind.NoSmu;
+                return;
+            }
+
             DramBaseAddress = smu.DramBaseAddress;
+            if (DramBaseAddress == 0)
+            {
+                UnavailableReason = UnavailableKind.NoDramBaseAddress;
+                return;
+            }
 
             tableDef = GetPowerTableDef(smu.PmTableVersion) ?? new PTDef();
             if (tableDef.tableSize <= 0)
-                throw new ApplicationException("Invalid table size.");
+            {
+                UnavailableReason = UnavailableKind.UnsupportedTableVersion;
+                return;
+            }
 
             TableSize = tableDef.tableSize;
             // TODO: Move definitions to RyzenSMU.
@@ -494,7 +519,7 @@ namespace ZenStates.Core
                 return;
 
             float bclkCorrection = 1.0f;
-            double? bclk = Mmio.Instance.GetBclk();
+            double? bclk = Mmio.Instance?.GetBclk();
 
             if (bclk != null)
                 bclkCorrection = (float)bclk / 100.0f;
@@ -528,7 +553,7 @@ namespace ZenStates.Core
 
         public SMU.Status Refresh()
         {
-            if (DramBaseAddress == 0)
+            if (UnavailableReason != UnavailableKind.None || smu == null)
                 return SMU.Status.FAILED;
 
             for (int retriesLeft = MAX_REFRESH_RETRIES; retriesLeft > 0; retriesLeft--)
@@ -540,7 +565,8 @@ namespace ZenStates.Core
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"Refresh attempt failed: {ex.Message}");
+                    Debug.WriteLine($"Refresh failed: {ex.Message}");
+                    return SMU.Status.FAILED;
                 }
             }
 
