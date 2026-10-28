@@ -15,3 +15,8 @@ Validation must compile/publish the bridge without launching hardware actions an
 - `Cpu.cs`: omit the duplicate initial refresh; the PowerTable constructor already initializes it.
 
 The bridge retains PM-table capability facts per session. Repeated describe operations do not refresh the table; `refresh-power-table` explicitly re-establishes availability. Offline tests in `tests/PowerTableHarness` open no hardware.
+
+
+## HardwareBridge: diagnostic resource initialization
+
+Cpu now honors Timings.Enabled for SMBus/MemoryConfig and Wmi.Enabled or Sensors.Enabled for SystemInfo. Null flags preserve enabled behavior. The bridge explicitly disables generic AMD MSR/SMN diagnostics with IoModule.Enabled=false and disables unused Timings/Aod/Wmi/Sensors diagnostics while retaining RyzenSMU/PowerTable and the PCI mutex. Disabled generic I/O omits AMD-family module loading, topology/patch/SVI/HSMP initialization, and ISA/SMBus mutex creation. The startup CPUID buffer is released after initialization in this profile; Opcode.Close is idempotent for later disposal. The wholly unused direct LPC module is removed. Default enabled diagnostic initialization order and error handling are retained. No driver installation, fallback, setting restoration, or protocol change is added.

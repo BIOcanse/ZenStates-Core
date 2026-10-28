@@ -12,6 +12,7 @@
             public int? AutorefreshInterval { get; set; }
         }
 
+        /// <summary>Generic AMD MSR/SMN diagnostics; SMU control remains available when disabled.</summary>
         public CpuInitModuleSettings IoModule { get; set; }
         public CpuInitModuleSettings Timings { get; set; }
         public CpuInitModuleSettings Aod { get; set; }

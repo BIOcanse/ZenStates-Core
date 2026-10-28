@@ -14,10 +14,13 @@ namespace ZenStates.Core.Hardware
         /// <summary>
         /// Opens the mutexes.
         /// </summary>
-        public static void Open()
+        public static void Open(bool pciOnly = false)
         {
-            _isaBusMutex = CreateOrOpenExistingMutex("Global\\Access_ISABUS.HTP.Method");
-            _smbusMutex = CreateOrOpenExistingMutex("Global\\Access_SMBUS.HTP.Method");
+            if (!pciOnly)
+            {
+                _isaBusMutex = CreateOrOpenExistingMutex("Global\\Access_ISABUS.HTP.Method");
+                _smbusMutex = CreateOrOpenExistingMutex("Global\\Access_SMBUS.HTP.Method");
+            }
             _pciBusMutex = CreateOrOpenExistingMutex("Global\\Access_PCI");
 
             Mutex CreateOrOpenExistingMutex(string name)

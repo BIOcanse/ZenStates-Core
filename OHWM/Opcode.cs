@@ -107,6 +107,9 @@ namespace ZenStates.Core.OHWM
 
         public static void Close()
         {
+            if (codeBuffer == IntPtr.Zero)
+                return;
+
             Rdtsc = null;
             Cpuid = null;
 
@@ -130,6 +133,8 @@ namespace ZenStates.Core.OHWM
                   FreeType.RELEASE);
             }
 #endif
+            codeBuffer = IntPtr.Zero;
+            size = 0;
         }
 
         [UnmanagedFunctionPointer(CallingConvention.StdCall)]

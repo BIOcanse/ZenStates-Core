@@ -26,7 +26,6 @@ namespace ZenStates.Core
         private readonly AmdFamily17 _pawnAmd;
         private readonly RyzenSmu _pawnRyzenSmu;
         private readonly SmbusDriverBase _smbusPiix4;
-        private readonly LpcIO _lpcIO;
         private bool disposedValue;
         private const string InitializationExceptionText = "CPU module initialization failed.";
 
@@ -358,14 +357,15 @@ namespace ZenStates.Core
                 if (info.vendor != Constants.VENDOR_AMD && info.vendor != Constants.VENDOR_HYGON)
                     throw new Exception("Not an AMD CPU");
 
-                Mutexes.Open();
+                Mutexes.Open(pciOnly: _settings.IoModule.Enabled == false);
 
                 try
                 {
-                    _pawnAmd = new AmdFamily17();
+                    if (_settings.IoModule.Enabled ?? true)
+                        _pawnAmd = new AmdFamily17();
                     _pawnRyzenSmu = new RyzenSmu();
-                    _smbusPiix4 = SmbusProvider.Instance;
-                    _lpcIO = new LpcIO();
+                    if (_settings.Timings.Enabled ?? true)
+                        _smbusPiix4 = SmbusProvider.Instance;
                 }
                 catch (Exception ex)
                 {
@@ -398,7 +398,8 @@ namespace ZenStates.Core
                     info.codeName = GetCodeName(info);
                     SMU.SetRyzenSmu(_pawnRyzenSmu);
                     smu = GetMaintainedSettings.GetByType(info.codeName);
-                    smu.Hsmp.Init(this);
+                    if (_settings.IoModule.Enabled ?? true)
+                        smu.Hsmp.Init(this);
                     smu.Version = GetSmuVersion();
                     var tableVersionResult = GetTableVersion();
                     smu.TableVersion = tableVersionResult.TableVersion;
@@ -425,7 +426,8 @@ namespace ZenStates.Core
             // Non-critical block
             try
             {
-                info.topology = GetCpuTopology(info.family, info.codeName, info.model);
+                if (_settings.IoModule.Enabled ?? true)
+                    info.topology = GetCpuTopology(info.family, info.codeName, info.model);
             }
             catch (Exception ex)
             {
@@ -435,17 +437,22 @@ namespace ZenStates.Core
 
             try
             {
-                memoryConfig = new MemoryConfig(this);
+                if (_settings.Timings.Enabled ?? true)
+                    memoryConfig = new MemoryConfig(this);
             }
             catch { }
 
             try
             {
-                info.patchLevel = GetPatchLevel();
-                info.svi2 = GetSVI2Info(info.codeName);
+                if (_settings.IoModule.Enabled ?? true)
+                {
+                    info.patchLevel = GetPatchLevel();
+                    info.svi2 = GetSVI2Info(info.codeName);
+                }
                 // AOD/APOB/legacy AGESA raw-memory diagnostics are not composed.
 
-                systemInfo = new SystemInfo(info, smu, string.Empty);
+                if ((_settings.Wmi.Enabled ?? true) || (_settings.Sensors.Enabled ?? true))
+                    systemInfo = new SystemInfo(info, smu, string.Empty);
                 powerTable = new PowerTable(_pawnRyzenSmu, info.codeName);
 
                 if (!SendTestMessage())
@@ -459,6 +466,9 @@ namespace ZenStates.Core
                 LastError = ex;
                 Status = IODriver.LibStatus.PARTIALLY_OK;
             }
+
+            if (_settings.IoModule.Enabled == false)
+                Opcode.Close();
         }
 
         // [31-28] ccd index
@@ -1511,7 +1521,6 @@ namespace ZenStates.Core
                     _pawnAmd?.Close();
                     _pawnRyzenSmu?.Dispose();
                     _smbusPiix4?.Dispose();
-                    _lpcIO?.Close();
                     systemInfo?.Dispose();
 
                     Mutexes.Close();
